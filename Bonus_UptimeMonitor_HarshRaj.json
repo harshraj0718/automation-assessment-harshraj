@@ -1,0 +1,276 @@
+[
+  {
+    "updatedAt": "2026-09-29T19:40:18.242Z",
+    "createdAt": "2026-09-29T18:05:17.569Z",
+    "id": "5VFzdFcKlQCDeB4R",
+    "name": "Kimai Demo Uptime Monitor",
+    "description": null,
+    "active": false,
+    "isArchived": false,
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "minutes"
+              }
+            ]
+          }
+        },
+        "id": "7a5b3341-330f-4c0a-9a96-89006a4b7b3a",
+        "name": "Every Five Minutes",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          0,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "url": "https://demo-stable.kimai.org/",
+          "options": {
+            "response": {
+              "response": {
+                "fullResponse": true,
+                "neverError": true,
+                "responseFormat": "text"
+              }
+            },
+            "timeout": 10000
+          }
+        },
+        "id": "5302af31-8ed6-4363-893e-b70ec67cd71b",
+        "name": "Check Kimai Demo",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          272,
+          0
+        ],
+        "retryOnFail": true,
+        "maxTries": 2,
+        "waitBetweenTries": 1000,
+        "onError": "continueErrorOutput"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "e8e2d510-8758-4f80-9033-35e8a6c7e8fd",
+                "leftValue": "={{ $json.statusCode }}",
+                "rightValue": 200,
+                "operator": {
+                  "type": "number",
+                  "operation": "equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "41189d17-b36a-469f-9cde-2e942fc8fcfa",
+        "name": "Status Is 200",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          528,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const response = $input.first()?.json ?? {};\nconst statusCode = Number(response.statusCode ?? 0);\nconst checkedAt = new Date().toISOString();\nconst body = typeof response.body === 'string' ? response.body.slice(0, 500) : JSON.stringify(response.body ?? '');\nreturn [{ json: { statusCode, checkedAt, alertText: `Uptime alert: https://demo-stable.kimai.org/ returned HTTP ${statusCode} at ${checkedAt}.\\n\\nResponse excerpt: ${body}` } }];"
+        },
+        "id": "65c868f9-c4bf-4291-8c46-06ad799585d9",
+        "name": "Format Non-200 Alert",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          784,
+          160
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const error = $input.first()?.json ?? {};\nconst checkedAt = new Date().toISOString();\nreturn [{ json: { checkedAt, alertText: `Uptime alert: https://demo-stable.kimai.org/ could not be checked at ${checkedAt}.\\n\\nError: ${JSON.stringify(error)}` } }];"
+        },
+        "id": "0e1b7f1e-d210-4e33-936b-5d6854731ff1",
+        "name": "Format Request Failure",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          528,
+          368
+        ]
+      },
+      {
+        "parameters": {
+          "sendTo": "your-email@example.com",
+          "subject": "Kimai demo uptime alert",
+          "emailType": "text",
+          "message": "={{ $json.alertText }}",
+          "options": {}
+        },
+        "id": "9399f20e-6356-490f-8cab-9b8dd9b1f56a",
+        "name": "Email Uptime Alert",
+        "type": "n8n-nodes-base.gmail",
+        "typeVersion": 2.1,
+        "position": [
+          1040,
+          272
+        ],
+        "onError": "continueErrorOutput"
+      },
+      {
+        "parameters": {
+          "jsCode": "const error = $input.first()?.json ?? {};\nreturn [{ json: { level: 'ERROR', loggedAt: new Date().toISOString(), workflow: 'Kimai Demo Uptime Monitor', details: JSON.stringify(error) } }];"
+        },
+        "id": "a90ad727-2baf-4e03-84ae-e3a275ee0b3d",
+        "name": "Log Alert Delivery Failure",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1312,
+          448
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const response = $input.first()?.json ?? {};\nreturn [{ json: { statusCode: response.statusCode ?? null, checkedAt: new Date().toISOString(), healthy: true } }];"
+        },
+        "id": "5f1d740f-1ac3-4302-a92a-a0642a6e1152",
+        "name": "Log Healthy Check",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          784,
+          -160
+        ]
+      }
+    ],
+    "connections": {
+      "Every Five Minutes": {
+        "main": [
+          [
+            {
+              "node": "Check Kimai Demo",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Check Kimai Demo": {
+        "main": [
+          [
+            {
+              "node": "Status Is 200",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Format Request Failure",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Status Is 200": {
+        "main": [
+          [
+            {
+              "node": "Log Healthy Check",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Format Non-200 Alert",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Format Non-200 Alert": {
+        "main": [
+          [
+            {
+              "node": "Email Uptime Alert",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Format Request Failure": {
+        "main": [
+          [
+            {
+              "node": "Email Uptime Alert",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Email Uptime Alert": {
+        "main": [
+          [],
+          [
+            {
+              "node": "Log Alert Delivery Failure",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "staticData": null,
+    "meta": {
+      "templateCredsSetupCompleted": true
+    },
+    "pinData": {},
+    "versionId": "740bcaa6-5090-4600-b4f3-637a7482dc2a",
+    "activeVersionId": null,
+    "versionCounter": 2,
+    "triggerCount": 0,
+    "tags": [],
+    "shared": [
+      {
+        "updatedAt": "2026-09-29T18:05:17.571Z",
+        "createdAt": "2026-09-29T18:05:17.571Z",
+        "role": "workflow:owner",
+        "workflowId": "5VFzdFcKlQCDeB4R",
+        "projectId": "sw6o2GF0J7xLjf7G",
+        "project": {
+          "updatedAt": "2026-09-29T17:58:21.719Z",
+          "createdAt": "2026-09-29T17:55:55.541Z",
+          "id": "sw6o2GF0J7xLjf7G",
+          "name": "Workflow owner",
+          "type": "personal",
+          "icon": null,
+          "description": null
+        }
+      }
+    ]
+  }
+]
